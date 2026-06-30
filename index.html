@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="天文時計">
+<title>天文時計 · Horologium Astronomicum</title>
+<style>
+  :root{
+    --void:#070b16; --glow:#1b2a4d;
+    --gilt:#c9a44c; --gilt-lite:#f2dd96; --gilt-dark:#7d6224;
+    --parch:#e7dcc1; --parch-dim:#9c917a;
+    --serif:'Hoefler Text','Garamond Premier Pro',Garamond,Georgia,'Times New Roman',serif;
+    --jp:'Hiragino Mincho ProN','Yu Mincho',system-ui,-apple-system,'Noto Serif JP',serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  [hidden]{display:none !important;}
+  body{
+    min-height:100vh;
+    background:radial-gradient(120% 90% at 50% 22%, var(--glow) 0%, #0b1426 38%, var(--void) 78%);
+    color:var(--parch); font-family:var(--jp);
+    display:flex; justify-content:center; padding:26px 18px 56px; overflow-x:hidden; overflow-x:clip;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{width:100%; max-width:540px; text-align:center;}
+  .eyebrow{ font-family:var(--serif); letter-spacing:.42em; text-transform:uppercase;
+    font-size:10px; color:var(--gilt-dark); margin:0 0 14px 6px; }
+  .moderow{ display:flex; align-items:center; justify-content:center; gap:16px; flex-wrap:wrap; margin:0 auto 20px; }
+  .modes{ display:flex; justify-content:center; margin:0;
+    border:1px solid var(--gilt-dark); border-radius:999px; width:max-content; overflow:hidden; }
+  .fftoggle{ display:inline-flex; align-items:center; gap:7px; font-size:.82rem; letter-spacing:.06em; color:var(--parch-dim); cursor:pointer; white-space:nowrap; -webkit-user-select:none; user-select:none; }
+  .fftoggle input{ accent-color:var(--gilt); width:16px; height:16px; cursor:pointer; }
+  .modes button{ font-family:var(--jp); font-size:.9rem; letter-spacing:.18em;
+    color:var(--parch-dim); background:transparent; border:none;
+    padding:9px 22px; cursor:pointer; transition:background .2s,color .2s; }
+  .modes button.active{ background:rgba(201,164,76,.16); color:var(--gilt-lite); }
+  .dispmodes{ display:flex; justify-content:center; margin:0 auto 22px;
+    border:1px solid var(--gilt-dark); border-radius:999px; width:100%; max-width:400px; overflow:hidden; }
+  .dispmodes button{ flex:1; display:flex; align-items:center; justify-content:center; text-align:center;
+    min-height:38px; font-family:var(--jp); font-size:.74rem; line-height:1.15; letter-spacing:0;
+    color:var(--parch-dim); background:transparent; border:none; padding:7px 5px; cursor:pointer;
+    transition:background .2s,color .2s; }
+  .dispmodes button + button{ border-left:1px solid var(--gilt-dark); }
+  .dispmodes button.active{ background:rgba(201,164,76,.16); color:var(--gilt-lite); }
+
+  .dialWrap{ filter:drop-shadow(0 16px 34px rgba(0,0,0,.6)); cursor:pointer; touch-action:pan-y; -webkit-user-select:none; user-select:none; }
+  .stage{ touch-action:pan-y; will-change:transform; }
+  svg#dial{ width:100%; height:auto; display:block; }
+  .fade{ animation:rise .9s cubic-bezier(.2,.7,.2,1) both; }
+  @keyframes rise{ from{opacity:0; transform:translateY(10px) scale(.985);} to{opacity:1;} }
+
+  .readout{ margin-top:22px; cursor:pointer; touch-action:pan-y; -webkit-user-select:none; user-select:none; }
+  .time{ font-family:var(--serif); font-size:clamp(2.4rem,13vw,3.4rem); letter-spacing:.1em;
+    color:var(--gilt-lite); font-variant-numeric:tabular-nums;
+    text-shadow:0 0 18px rgba(201,164,76,.22); line-height:1; }
+  .date{ color:var(--parch-dim); font-size:.95rem; letter-spacing:.14em; margin-top:8px; }
+  .astro{ margin-top:14px; font-size:.96rem; line-height:1.85; }
+  .astro .sym{ color:var(--gilt-lite); font-family:var(--serif); }
+  .astro .v{ color:var(--parch); }
+  .astro .sub{ color:var(--parch-dim); }
+
+  .caption{ color:var(--parch-dim); font-size:.78rem; letter-spacing:.1em; margin:14px 0 4px; }
+  .pgrid{ display:grid; grid-template-columns:1fr 1fr; gap:6px 18px; max-width:440px; margin:6px auto 0; }
+  .prow{ display:flex; align-items:center; gap:8px; font-size:.82rem; }
+  .dot{ width:10px; height:10px; border-radius:50%; flex:0 0 auto; box-shadow:0 0 6px rgba(255,255,255,.15); }
+  .pn{ color:var(--parch); min-width:3.4em; text-align:left; }
+  .pv{ color:var(--gilt); font-family:var(--serif); font-variant-numeric:tabular-nums; margin-left:auto; }
+  .pd{ color:var(--parch-dim); font-variant-numeric:tabular-nums; min-width:4.4em; text-align:right; }
+
+  .legend{ margin:20px auto 0; max-width:440px; color:var(--parch-dim); font-size:.78rem; line-height:1.75; }
+
+  .controls{ margin-top:24px; display:flex; flex-direction:column; gap:14px; }
+  .sliderRow label{ display:flex; justify-content:space-between; align-items:baseline;
+    font-size:.74rem; letter-spacing:.12em; color:var(--parch-dim); margin-bottom:8px; }
+  .sliderRow .simdate{ color:var(--gilt); font-family:var(--serif); letter-spacing:.06em; }
+  input[type=range]{ -webkit-appearance:none; appearance:none; width:100%; height:2px;
+    background:var(--gilt-dark); border-radius:2px; outline:none; cursor:pointer; }
+  input[type=range]::-webkit-slider-thumb{ -webkit-appearance:none; appearance:none;
+    width:18px; height:18px; border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, var(--gilt-lite), var(--gilt) 55%, var(--gilt-dark));
+    border:1px solid #2a2210; box-shadow:0 1px 5px rgba(0,0,0,.6); }
+  input[type=range]::-moz-range-thumb{ width:18px; height:18px; border:none; border-radius:50%;
+    background:radial-gradient(circle at 35% 30%, var(--gilt-lite), var(--gilt) 55%, var(--gilt-dark));
+    box-shadow:0 1px 5px rgba(0,0,0,.6); }
+  .btns{ display:flex; gap:12px; justify-content:center; }
+  .btns button{ font-family:var(--jp); font-size:.85rem; letter-spacing:.1em;
+    color:var(--gilt-lite); background:transparent; border:1px solid var(--gilt-dark);
+    border-radius:999px; padding:9px 20px; cursor:pointer;
+    transition:background .2s,border-color .2s,color .2s; }
+  .btns button:hover{ background:rgba(201,164,76,.1); border-color:var(--gilt); }
+  .btns button.active{ background:rgba(201,164,76,.16); border-color:var(--gilt); color:#fff; }
+  body.fs{ background:#000; padding:0; width:100vw; height:100vh; overflow:hidden; }
+  body.fs .wrap{ max-width:none; width:100vw; height:100vh; margin:0;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2.4vh; }
+  body.fs .eyebrow,
+  body.fs .moderow,
+  body.fs .dispmodes,
+  body.fs .controls,
+  body.fs .caption,
+  body.fs .legend{ display:none !important; }
+  body.fs .dialWrap{ filter:none; margin:0; }
+  body.fs .readout{ margin:0; }
+  body.fs[data-disp="analog"] svg#dial{ width:auto; height:96vmin; max-width:98vw; }
+  body.fs[data-disp="both"] svg#dial{ width:auto; height:72vmin; max-width:90vw; }
+  body.fs[data-disp="both"] .time{ font-size:min(7vw,9vh); }
+  body.fs[data-disp="digital"] .time{ font-size:min(14vw,20vh); }
+  body.fs[data-disp="digital"] .date{ font-size:min(3.4vw,4.4vh); margin-top:1.6vh; }
+  .fshint{ position:fixed; left:50%; transform:translateX(-50%); bottom:18px;
+    color:var(--parch); font-size:.8rem; letter-spacing:.12em; pointer-events:none; white-space:nowrap;
+    background:rgba(0,0,0,.55); border:1px solid var(--gilt-dark); border-radius:999px; padding:8px 16px;
+    opacity:0; transition:opacity .45s ease; }
+  body:not(.fs) .fshint{ display:none; }
+  .fshint.show{ opacity:.8; }
+  :focus-visible{ outline:2px solid var(--gilt); outline-offset:3px; }
+  @media (prefers-reduced-motion: reduce){ .fade{ animation:none; } }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="fshint" id="fshint">2本指でタップすると全画面を解除します</div>
+    <p class="eyebrow">Horologium Astronomicum</p>
+    <div class="moderow">
+      <div class="modes" role="tablist">
+        <button data-mode="clock" class="active" role="tab">天文時計</button>
+        <button data-mode="solar" role="tab">太陽系</button>
+      </div>
+      <label class="fftoggle"><input type="checkbox" id="ffcheck"> 早送りをオン</label>
+    </div>
+    <div class="dispmodes" role="tablist" aria-label="表示スタイル">
+      <button data-disp="analog" class="active" role="tab">アナログ</button>
+      <button data-disp="both" role="tab">デジアナ</button>
+      <button data-disp="digital" role="tab">デジタル</button>
+    </div>
+
+    <div class="stage">
+    <div class="dialWrap fade">
+      <svg id="dial" viewBox="0 0 680 680" role="img" aria-label="天文表示"></svg>
+    </div>
+
+    <div class="readout" id="roClock">
+      <div class="time" id="time">--:--:--</div>
+      <div class="date" id="date">—</div>
+      <div class="astro">
+        <div><svg class="sym" width="16" height="16" viewBox="-10 -10 20 20" style="vertical-align:-2px;display:inline-block"><circle cx="0" cy="0" r="7.5" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="0" cy="0" r="1.8" fill="currentColor"/></svg> <span class="v" id="sun">—</span></div>
+        <div><svg class="sym" width="16" height="16" viewBox="-10 -10 20 20" style="vertical-align:-2px;display:inline-block"><g transform="rotate(-18)"><path fill-rule="evenodd" d="M 0 -8 A 8 8 0 1 0 0 8 A 8 8 0 1 0 0 -8 Z M 4.5 -8.5 A 8.5 8.5 0 1 0 4.5 8.5 A 8.5 8.5 0 1 0 4.5 -8.5 Z" fill="currentColor"/></g></svg> <span class="v" id="moon">—</span></div>
+      </div>
+    </div>
+
+    <div class="readout" id="roSolar" hidden>
+      <div class="time" id="timeS">--:--:--</div>
+      <div class="date" id="dateS">—</div>
+      <div class="caption">各惑星の黄経と太陽からの距離</div>
+      <div class="pgrid" id="pgrid"></div>
+    </div>
+
+    <p class="legend" id="legClock">
+      金色の太陽が時刻（外周のローマ数字＝24時間）と季節を、銀色の月が満ち欠けを示します。
+      内側の青い盤は空で、上が昼（DIES）・下が夜（NOX）、地平線で太陽が出入りします。
+    </p>
+    <p class="legend" id="legSolar" hidden>
+      中央の太陽が分針（1時間で1回転）、月をかたどった針が秒針（1分で1回転）、短針が時を示し、外周のローマ数字で読みます。
+      秒針の月は実際の月相を映し、外環の黄道帯の金の印は太陽の現在の星座位置です。惑星はその時点の実際の黄経に、軌道半径は対数スケールで表示します。
+    </p>
+    </div>
+
+    <div class="controls" id="controls" hidden>
+      <div class="sliderRow">
+        <label for="off">日付を前後に動かす <span class="simdate" id="simdate"></span></label>
+        <input type="range" id="off" min="-366" max="366" step="1" value="0" aria-label="日付オフセット（日）">
+      </div>
+      <div class="btns">
+        <button id="now">今に戻す</button>
+        <button id="ff">早送り</button>
+      </div>
+    </div>
+  </div>
+
+<script>
+(function(){
+  "use strict";
+  const C = 340;
+  const rad = d => d*Math.PI/180;
+  const deg = r => r*180/Math.PI;
+  const norm = a => ((a%360)+360)%360;
+  const f = n => (Math.round(n*100)/100);
+  const pad = n => String(n).padStart(2,'0');
+  function pt(cx,cy,r,ang){ const a=rad(ang-90); return [cx+r*Math.cos(a), cy+r*Math.sin(a)]; }
+  const $ = id => document.getElementById(id);
+
+  const COL = { night:'#08142e', gilt:'#c9a44c', giltLite:'#f2dd96', giltDark:'#6f561f',
+    silver:'#eef1f8', moonDark:'#171f3a', ember:'#c9682e', romanBg:'#0d1730' };
+  const ROM = ['XII','I','II','III','IV','V','VI','VII','VIII','IX','X','XI'];
+  const SIGN  = ['牡羊座','牡牛座','双子座','蟹座','獅子座','乙女座','天秤座','蠍座','射手座','山羊座','水瓶座','魚座'];
+  const WD    = ['日','月','火','水','木','金','土'];
+
+  /* zodiac symbols as device-independent SVG paths (centered at origin, ~±10 box) */
+  const ZP = [
+    `<path d="M -8 -1 C -8 -7 0 -7 0 3 C 0 -7 8 -7 8 -1"/>`,
+    `<circle cx="0" cy="4.2" r="5.2"/><path d="M -7.5 -9 Q 0 1.8 7.5 -9"/>`,
+    `<path d="M -4.6 -6.5 L -4.6 6.5"/><path d="M 4.6 -6.5 L 4.6 6.5"/><path d="M -6.5 -6.5 Q 0 -9.5 6.5 -6.5"/><path d="M -6.5 6.5 Q 0 9.5 6.5 6.5"/>`,
+    `<path d="M -8.5 -2.2 C -6 -6 1 -6.5 4.5 -4.6"/><circle cx="6.2" cy="-4" r="1.9"/><path d="M 8.5 2.2 C 6 6 -1 6.5 -4.5 4.6"/><circle cx="-6.2" cy="4" r="1.9"/>`,
+    `<circle cx="-4.6" cy="4.6" r="2.7"/><path d="M -2.4 3.1 C -5.5 -6 7 -8.5 7 -1 C 7 2.6 3.4 3.6 7 5.4"/>`,
+    `<path d="M -9 6.5 L -9 -4 C -9 -7 -5.5 -7 -5.5 -4 L -5.5 6.5 M -5.5 -4 C -5.5 -7 -2 -7 -2 -4 L -2 6.5 C -2 8.5 3 8.5 3 3 C 3 -0.2 -1.2 0.6 0.6 4.4"/>`,
+    `<path d="M -9 7 L 9 7"/><path d="M -9 0.5 L -3.4 0.5 A 3.4 3.4 0 0 1 3.4 0.5 L 9 0.5"/>`,
+    `<path d="M -9 6.5 L -9 -4 C -9 -7 -5.5 -7 -5.5 -4 L -5.5 6.5 M -5.5 -4 C -5.5 -7 -2 -7 -2 -4 L -2 6.5 C -2 8.2 2 8.2 2 4 L 2 0 L 9 -3"/><path d="M 9 -3 L 4 -3 M 9 -3 L 9 2"/>`,
+    `<path d="M -7.5 7.5 L 6.5 -6.5"/><path d="M 6.5 -6.5 L 0.3 -6.5 M 6.5 -6.5 L 6.5 -0.3"/><path d="M -4.5 -1.5 L 1.5 4.5"/>`,
+    `<path d="M -8.5 -4 C -7 -1 -4.5 -1 -3.5 -4.5 C -3 -6.5 -0.5 -6.5 0 -3 C 0.6 1 -0.5 4.5 2.5 4.8 C 6 5.2 7.5 0 4.8 -2 C 2.8 -3.5 0.8 -1 2.5 1 C 3.3 2 4.6 1.8 5.2 0.6"/>`,
+    `<path d="M -9 -2 L -4.5 -5 L 0 -2 L 4.5 -5 L 9 -2"/><path d="M -9 4 L -4.5 1 L 0 4 L 4.5 1 L 9 4"/>`,
+    `<path d="M -1.5 -8 C -7.5 -4 -7.5 4 -1.5 8"/><path d="M 1.5 -8 C 7.5 -4 7.5 4 1.5 8"/><path d="M -5.5 0 L 5.5 0"/>`
+  ];
+  function zsym(i,cx,cy,scale,color,sw,op){
+    return `<g transform="translate(${f(cx)} ${f(cy)}) scale(${scale})" fill="none" stroke="${color}" stroke-opacity="${op==null?1:op}" stroke-width="${f(sw/scale)}" stroke-linecap="round" stroke-linejoin="round">${ZP[i]}</g>`;
+  }
+  function zsymInline(i){
+    return `<svg width="16" height="16" viewBox="-11 -11 22 22" style="vertical-align:-3px;margin:0 1px"><g fill="none" stroke="${COL.giltLite}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ZP[i]}</g></svg>`;
+  }
+
+  /* ===== astronomy: sun & moon ===== */
+  function sunLongitude(jd){
+    const n=jd-2451545.0;
+    const L=norm(280.460+0.9856474*n);
+    const g=rad(norm(357.528+0.9856003*n));
+    return norm(L+1.915*Math.sin(g)+0.020*Math.sin(2*g));
+  }
+  function moonLongitude(jd){
+    const d=jd-2451543.5;
+    const N=rad(norm(125.1228-0.0529538083*d)), i=rad(5.1454);
+    const w=rad(norm(318.0634+0.1643573223*d)), a=60.2666, e=0.054900;
+    const M=rad(norm(115.3654+13.0649929509*d));
+    let E=M+e*Math.sin(M)*(1+e*Math.cos(M));
+    for(let k=0;k<4;k++){ E=E-(E-e*Math.sin(E)-M)/(1-e*Math.cos(E)); }
+    const xv=a*(Math.cos(E)-e), yv=a*Math.sqrt(1-e*e)*Math.sin(E);
+    const v=Math.atan2(yv,xv), r=Math.sqrt(xv*xv+yv*yv);
+    const xe=r*(Math.cos(N)*Math.cos(v+w)-Math.sin(N)*Math.sin(v+w)*Math.cos(i));
+    const ye=r*(Math.sin(N)*Math.cos(v+w)+Math.cos(N)*Math.sin(v+w)*Math.cos(i));
+    let lon=norm(deg(Math.atan2(ye,xe)));
+    const Ms=rad(norm(356.0470+0.9856002585*d)), ws=rad(norm(282.9404+4.70935e-5*d));
+    const Ls=ws+Ms, Lm=N+w+M, D=Lm-Ls, Ff=Lm-N;
+    const dl=-1.274*Math.sin(M-2*D)+0.658*Math.sin(2*D)-0.186*Math.sin(Ms)
+      -0.059*Math.sin(2*M-2*D)-0.057*Math.sin(M-2*D+Ms)+0.053*Math.sin(M+2*D)
+      +0.046*Math.sin(2*D-Ms)+0.041*Math.sin(M-Ms)-0.035*Math.sin(D)
+      -0.031*Math.sin(M+Ms)-0.015*Math.sin(2*Ff-2*D)+0.011*Math.sin(M-4*D);
+    return norm(lon+dl);
+  }
+  function litPath(cx,cy,r,p){
+    const c=Math.cos(2*Math.PI*p), rx=Math.abs(c)*r, wax=p<0.5;
+    const limb=wax?1:0, term=(c>0)?(wax?1:0):(wax?0:1);
+    return `M ${cx} ${cy-r} A ${r} ${r} 0 0 ${limb} ${cx} ${cy+r} A ${f(rx)} ${r} 0 0 ${term} ${cx} ${cy-r} Z`;
+  }
+  function phaseName(p){
+    if(p<0.02||p>=0.98) return '新月';
+    if(p<0.23) return '三日月（上弦前）';
+    if(p<0.27) return '上弦の月';
+    if(p<0.48) return '満ちゆく月（上弦過ぎ）';
+    if(p<0.52) return '満月';
+    if(p<0.73) return '欠けゆく月（下弦前）';
+    if(p<0.77) return '下弦の月';
+    return '有明の月（下弦過ぎ）';
+  }
+
+  /* ===== astronomy: planets (Standish / JPL approximate elements, 1800-2050) ===== */
+  const PL = [
+    {k:'me',jp:'水星',c:'#9a948c',r:3.6, a:0.38709927,aR:0.00000037, e:0.20563593,eR:0.00001906, I:7.00497902,IR:-0.00594749, L:252.25032350,LR:149472.67411175, W:77.45779628,WR:0.16047689, O:48.33076593,OR:-0.12534081},
+    {k:'ve',jp:'金星',c:'#e3c98f',r:5.5, a:0.72333566,aR:0.00000390, e:0.00677672,eR:-0.00004107, I:3.39467605,IR:-0.00078890, L:181.97909950,LR:58517.81538729, W:131.60246718,WR:0.00268329, O:76.67984255,OR:-0.27769418},
+    {k:'ea',jp:'地球',c:'#3f86d6',r:6.0, a:1.00000261,aR:0.00000562, e:0.01671123,eR:-0.00004392, I:-0.00001531,IR:-0.01294668, L:100.46457166,LR:35999.37244981, W:102.93768193,WR:0.32327364, O:0.0,OR:0.0},
+    {k:'ma',jp:'火星',c:'#c2542e',r:4.5, a:1.52371034,aR:0.00001847, e:0.09339410,eR:0.00007882, I:1.84969142,IR:-0.00813131, L:-4.55343205,LR:19140.30268499, W:-23.94362959,WR:0.44441088, O:49.55953891,OR:-0.29257343},
+    {k:'ju',jp:'木星',c:'#d2a978',r:12,  a:5.20288700,aR:-0.00011607, e:0.04838624,eR:-0.00013253, I:1.30439695,IR:-0.00183714, L:34.39644051,LR:3034.74612775, W:14.72847983,WR:0.21252668, O:100.47390909,OR:0.20469106},
+    {k:'sa',jp:'土星',c:'#d9c47e',r:10, ring:true, a:9.53667594,aR:-0.00125060, e:0.05386179,eR:-0.00050991, I:2.48599187,IR:0.00193609, L:49.95424423,LR:1222.49362201, W:92.59887831,WR:-0.41897216, O:113.66242448,OR:-0.28867794},
+    {k:'ur',jp:'天王星',c:'#a6dadd',r:8, a:19.18916464,aR:-0.00196176, e:0.04725744,eR:-0.00004397, I:0.77263783,IR:-0.00242939, L:313.23810451,LR:428.48202785, W:170.95427630,WR:0.40805281, O:74.01692503,OR:0.04240589},
+    {k:'ne',jp:'海王星',c:'#4f74c6',r:7.5,a:30.06992276,aR:0.00026291, e:0.00859048,eR:0.00005105, I:1.77004347,IR:0.00035372, L:-55.12002969,LR:218.45945325, W:44.96476227,WR:-0.32241464, O:131.78422574,OR:-0.00508664}
+  ];
+  function planetPos(p,T){
+    const a=p.a+p.aR*T, e=p.e+p.eR*T, I=p.I+p.IR*T;
+    const L=p.L+p.LR*T, W=p.W+p.WR*T, O=p.O+p.OR*T;
+    let M=L-W; M=((M+180)%360+360)%360-180;
+    const eDeg=57.29577951308232*e;
+    let E=M;
+    for(let k=0;k<8;k++){ const dM=M-(E-eDeg*Math.sin(rad(E))); E=E+dM/(1-e*Math.cos(rad(E))); }
+    const xp=a*(Math.cos(rad(E))-e), yp=a*Math.sqrt(1-e*e)*Math.sin(rad(E));
+    const w=W-O;
+    const cw=Math.cos(rad(w)), sw=Math.sin(rad(w));
+    const cO=Math.cos(rad(O)), sO=Math.sin(rad(O));
+    const ci=Math.cos(rad(I)), si=Math.sin(rad(I));
+    const xe=(cw*cO-sw*sO*ci)*xp+(-sw*cO-cw*sO*ci)*yp;
+    const ye=(cw*sO+sw*cO*ci)*xp+(-sw*sO+cw*cO*ci)*yp;
+    const ze=(sw*si)*xp+(cw*si)*yp;
+    return { lon:norm(deg(Math.atan2(ye,xe))), dist:Math.sqrt(xe*xe+ye*ye+ze*ze) };
+  }
+
+  /* ===== shared state ===== */
+  let offsetMs=0, ff=false, last=performance.now(), mode='clock', disp='analog', dragging=false;
+  const FF_SPEED=28800;
+  const offEl=$('off'), simEl=$('simdate');
+  const t_time=$('time'), t_date=$('date'), t_sun=$('sun'), t_moon=$('moon');
+  const s_time=$('timeS'), s_date=$('dateS');
+
+  /* ===== CLOCK mode ===== */
+  const Rk={roman:311, zod:272, sky:250, sun:178, moon:120}, moonR=17;
+  let c_sun,c_zod,c_moonG,c_moonArm,c_moonLit;
+  function buildClock(){
+    const s=[];
+    s.push(`<defs>
+      <linearGradient id="lapisG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f63ab"/><stop offset="1" stop-color="#11305f"/></linearGradient>
+      <linearGradient id="emberG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${COL.ember}" stop-opacity="0"/><stop offset="0.5" stop-color="${COL.ember}" stop-opacity="0.55"/><stop offset="1" stop-color="${COL.ember}" stop-opacity="0"/></linearGradient>
+      <radialGradient id="sunBall" cx="35%" cy="32%" r="70%"><stop offset="0" stop-color="#fff7d8"/><stop offset="0.45" stop-color="${COL.giltLite}"/><stop offset="1" stop-color="${COL.giltDark}"/></radialGradient>
+      <radialGradient id="moonG2" cx="38%" cy="35%" r="75%"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#cfd6ea"/></radialGradient>
+      <radialGradient id="earthG" cx="40%" cy="35%" r="75%"><stop offset="0" stop-color="#2c5a86"/><stop offset="1" stop-color="#0c1c36"/></radialGradient>
+      <radialGradient id="hub" cx="50%" cy="45%" r="60%"><stop offset="0" stop-color="${COL.giltLite}"/><stop offset="1" stop-color="${COL.giltDark}"/></radialGradient>
+      <filter id="soft" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="6"/></filter>
+      <clipPath id="skyClip"><circle cx="${C}" cy="${C}" r="${Rk.sky}"/></clipPath>
+    </defs>`);
+    s.push(`<circle cx="${C}" cy="${C}" r="332" fill="none" stroke="${COL.gilt}" stroke-width="2"/>`);
+    s.push(`<circle cx="${C}" cy="${C}" r="296" fill="none" stroke="${COL.giltDark}" stroke-width="1.5"/>`);
+    s.push(`<path d="M ${C-329} ${C} A 329 329 0 1 1 ${C+329} ${C} A 329 329 0 1 1 ${C-329} ${C} M ${C-298} ${C} A 298 298 0 1 0 ${C+298} ${C} A 298 298 0 1 0 ${C-298} ${C} Z" fill="${COL.romanBg}" fill-rule="evenodd"/>`);
+    let ticks='', nums='';
+    for(let k=0;k<24;k++){
+      const ang=k*15;
+      const [x1,y1]=pt(C,C,294,ang),[x2,y2]=pt(C,C,283,ang);
+      ticks+=`<line x1="${f(x1)}" y1="${f(y1)}" x2="${f(x2)}" y2="${f(y2)}" stroke="${COL.gilt}" stroke-width="${k%6===0?2:1}" stroke-opacity="${k%6===0?.9:.5}"/>`;
+      const [tx,ty]=pt(C,C,Rk.roman,ang);
+      nums+=`<text x="${f(tx)}" y="${f(ty)}" fill="${COL.giltLite}" font-family="Georgia,'Times New Roman',serif" font-size="23" text-anchor="middle" dominant-baseline="central" letter-spacing="0.5">${ROM[(12+k)%12]}</text>`;
+    }
+    s.push(ticks,nums);
+    let zb=`<circle cx="${C}" cy="${C}" r="272" fill="none" stroke="#13325f" stroke-width="40"/><circle cx="${C}" cy="${C}" r="292" fill="none" stroke="${COL.giltDark}" stroke-width="1"/><circle cx="${C}" cy="${C}" r="252" fill="none" stroke="${COL.giltDark}" stroke-width="1"/>`;
+    let zdiv='', zglyph='';
+    for(let i=0;i<12;i++){
+      const a0=i*30;
+      const [lx1,ly1]=pt(C,C,252,a0),[lx2,ly2]=pt(C,C,292,a0);
+      zdiv+=`<line x1="${f(lx1)}" y1="${f(ly1)}" x2="${f(lx2)}" y2="${f(ly2)}" stroke="${COL.gilt}" stroke-width="1" stroke-opacity="0.3"/>`;
+      const [gx,gy]=pt(C,C,Rk.zod,a0+15);
+      zglyph+=zsym(i, gx, gy, 1.2, COL.giltLite, 2.2);
+    }
+    s.push(`<g id="zodiac">${zb}${zdiv}${zglyph}</g>`);
+    s.push(`<g clip-path="url(#skyClip)">
+      <circle cx="${C}" cy="${C}" r="${Rk.sky}" fill="${COL.night}"/>
+      <path d="M ${C-Rk.sky} ${C} A ${Rk.sky} ${Rk.sky} 0 0 1 ${C+Rk.sky} ${C} Z" fill="url(#lapisG)"/>
+      <circle cx="${C}" cy="${C-78}" r="118" fill="none" stroke="${COL.gilt}" stroke-opacity="0.12" stroke-width="1"/>
+      <circle cx="${C}" cy="${C-34}" r="196" fill="none" stroke="${COL.gilt}" stroke-opacity="0.08" stroke-width="1"/>
+      <rect x="${C-Rk.sky}" y="${C-24}" width="${2*Rk.sky}" height="48" fill="url(#emberG)"/>
+      <line x1="${C-Rk.sky}" y1="${C}" x2="${C+Rk.sky}" y2="${C}" stroke="${COL.gilt}" stroke-opacity="0.28" stroke-width="1"/>
+    </g>`);
+    s.push(`<g fill="${COL.giltLite}" fill-opacity="0.55" font-family="Georgia,'Times New Roman',serif" text-anchor="middle">
+      <text x="${C}" y="${C-Rk.sky+44}" font-size="13" letter-spacing="4">DIES</text>
+      <text x="${C}" y="${C+Rk.sky-30}" font-size="13" letter-spacing="4">NOX</text>
+      <text x="${C-176}" y="${C-9}" font-size="11" letter-spacing="2">ORTVS</text>
+      <text x="${C+176}" y="${C-9}" font-size="11" letter-spacing="2">OCCASVS</text>
+    </g>`);
+    s.push(`<line id="moonArm" x1="${C}" y1="${C}" x2="${C}" y2="${C-Rk.moon}" stroke="${COL.gilt}" stroke-width="2" stroke-opacity="0.8"/>`);
+    s.push(`<g id="moonG">
+      <circle cx="${C}" cy="${C}" r="${moonR+1.5}" fill="none" stroke="${COL.gilt}" stroke-width="1.5"/>
+      <circle cx="${C}" cy="${C}" r="${moonR}" fill="${COL.moonDark}"/>
+      <path id="moonLit" d="" fill="url(#moonG2)"/>
+      <circle cx="${C}" cy="${C}" r="${moonR}" fill="none" stroke="#0a0f1f" stroke-width="0.6" stroke-opacity="0.5"/>
+    </g>`);
+    let rays='';
+    for(let i=0;i<12;i++){
+      const a=i*30, [ox,oy]=pt(C,C-Rk.sun,29,a),[ix,iy]=pt(C,C-Rk.sun,20,a);
+      rays+=`<line x1="${f(ix)}" y1="${f(iy)}" x2="${f(ox)}" y2="${f(oy)}" stroke="${COL.gilt}" stroke-width="2"/>`;
+    }
+    s.push(`<g id="sunG">
+      <line x1="${C}" y1="${C}" x2="${C}" y2="${C-322}" stroke="${COL.gilt}" stroke-width="3"/>
+      <line x1="${C}" y1="${C}" x2="${C}" y2="${C+46}" stroke="${COL.gilt}" stroke-width="3"/>
+      <path d="M ${C} ${C-330} l 7 14 l -14 0 Z" fill="${COL.giltLite}"/>
+      <circle cx="${C}" cy="${C-Rk.sun}" r="30" fill="${COL.giltLite}" fill-opacity="0.25" filter="url(#soft)"/>
+      ${rays}
+      <circle cx="${C}" cy="${C-Rk.sun}" r="20" fill="url(#sunBall)" stroke="${COL.giltDark}" stroke-width="1"/>
+    </g>`);
+    s.push(`<circle cx="${C}" cy="${C}" r="26" fill="url(#earthG)" stroke="${COL.gilt}" stroke-width="2"/>
+      <ellipse cx="${C}" cy="${C}" rx="26" ry="10" fill="none" stroke="${COL.gilt}" stroke-opacity="0.3"/>
+      <line x1="${C-26}" y1="${C}" x2="${C+26}" y2="${C}" stroke="${COL.gilt}" stroke-opacity="0.3"/>
+      <circle cx="${C}" cy="${C}" r="6" fill="url(#hub)"/>`);
+    $('dial').innerHTML=s.join('');
+    c_sun=$('sunG'); c_zod=$('zodiac'); c_moonG=$('moonG'); c_moonArm=$('moonArm'); c_moonLit=$('moonLit');
+  }
+  function updateClock(ms){
+    const date=new Date(ms), jd=ms/86400000+2440587.5;
+    const h=date.getHours()+date.getMinutes()/60+date.getSeconds()/3600+date.getMilliseconds()/3600000;
+    const sunAngle=norm((h-12)/24*360);
+    const sunLon=sunLongitude(jd), moonLon=moonLongitude(jd);
+    const elong=norm(moonLon-sunLon), p=elong/360, k=(1-Math.cos(rad(elong)))/2;
+    const moonAngle=norm(sunAngle+elong), ringRot=norm(sunAngle-sunLon);
+    c_sun.setAttribute('transform',`rotate(${f(sunAngle)} ${C} ${C})`);
+    c_zod.setAttribute('transform',`rotate(${f(ringRot)} ${C} ${C})`);
+    const [mx,my]=pt(C,C,Rk.moon,moonAngle);
+    c_moonArm.setAttribute('x2',f(mx)); c_moonArm.setAttribute('y2',f(my));
+    c_moonG.setAttribute('transform',`translate(${f(mx-C)} ${f(my-C)})`);
+    c_moonLit.setAttribute('d',litPath(C,C,moonR,p));
+    t_time.textContent=`${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+    t_date.textContent=`${date.getFullYear()}年${date.getMonth()+1}月${date.getDate()}日（${WD[date.getDay()]}）`;
+    const si=Math.floor(sunLon/30)%12;
+    t_sun.innerHTML=`太陽　<span class="v">${zsymInline(si)} ${SIGN[si]}　${(sunLon-30*si).toFixed(1)}°</span>`;
+    t_moon.innerHTML=`月　<span class="v">${phaseName(p)}</span>　<span class="sub">輝面比 ${Math.round(k*100)}%・月齢 約${(p*29.53).toFixed(1)}日</span>`;
+  }
+
+  /* ===== SOLAR mode (CVDK Grand Planetarium Eccentric style) ===== */
+  let satring=null, ss_hour=null, ss_minsun=null, ss_secArm=null, ss_secMoon=null, ss_secLit=null, ss_mark=null;
+  const dataEls={};
+  function buildSolar(){
+    const minL=Math.log10(0.38709927), maxL=Math.log10(30.06992276), inner=58, outer=250;
+    PL.forEach(p=>{ p.R=inner+(Math.log10(p.a)-minL)/(maxL-minL)*(outer-inner); });
+    const DR=326;
+    const s=[];
+    s.push(`<defs>
+      <radialGradient id="dialG" cx="42%" cy="36%" r="72%"><stop offset="0" stop-color="#163a6c"/><stop offset="0.55" stop-color="#0c2046"/><stop offset="1" stop-color="#050f26"/></radialGradient>
+      <radialGradient id="sunCore" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="#fff7da"/><stop offset="0.5" stop-color="${COL.giltLite}"/><stop offset="1" stop-color="${COL.giltDark}"/></radialGradient>
+      <radialGradient id="sunHalo" cx="50%" cy="50%" r="50%"><stop offset="0" stop-color="${COL.giltLite}" stop-opacity="0.45"/><stop offset="1" stop-color="${COL.giltLite}" stop-opacity="0"/></radialGradient>
+      <radialGradient id="moonGrad" cx="38%" cy="35%" r="75%"><stop offset="0" stop-color="#ffffff"/><stop offset="1" stop-color="#c9d2e8"/></radialGradient>
+      <clipPath id="dialClip"><circle cx="${C}" cy="${C}" r="${DR}"/></clipPath>
+    </defs>`);
+    s.push(`<circle cx="${C}" cy="${C}" r="${DR+4}" fill="none" stroke="${COL.gilt}" stroke-width="3"/>`);
+    s.push(`<circle cx="${C}" cy="${C}" r="${DR}" fill="url(#dialG)"/>`);
+    let seed=20260629, rnd=()=>{seed=(seed*1103515245+12345)&0x7fffffff; return seed/0x7fffffff;};
+    let flecks='<g clip-path="url(#dialClip)">';
+    for(let i=0;i<175;i++){
+      const ang=rnd()*Math.PI*2, rr=Math.sqrt(rnd())*DR;
+      const x=C+rr*Math.cos(ang), y=C+rr*Math.sin(ang), gold=rnd()<0.58;
+      flecks+=`<circle cx="${f(x)}" cy="${f(y)}" r="${f(0.4+rnd()*1.0)}" fill="${gold?'#d8b65a':'#e8eeff'}" fill-opacity="${f(0.18+rnd()*0.5)}"/>`;
+    }
+    flecks+='</g>'; s.push(flecks);
+    let orbits='';
+    PL.forEach(p=>{ orbits+=`<circle cx="${C}" cy="${C}" r="${f(p.R)}" fill="none" stroke="${COL.gilt}" stroke-opacity="0.16" stroke-width="1"/>`; });
+    s.push(orbits);
+    const Rz=268; let zod='';
+    for(let i=0;i<12;i++){
+      const a=norm(-(30*i));
+      const [t1x,t1y]=pt(C,C,256,a),[t2x,t2y]=pt(C,C,280,a);
+      zod+=`<line x1="${f(t1x)}" y1="${f(t1y)}" x2="${f(t2x)}" y2="${f(t2y)}" stroke="${COL.gilt}" stroke-opacity="0.25" stroke-width="1"/>`;
+      const [gx,gy]=pt(C,C,Rz,norm(-(30*i+15)));
+      zod+=zsym(i, gx, gy, 0.95, COL.giltLite, 2.2, 0.78);
+    }
+    s.push(zod);
+    s.push(`<g id="ssMark"><path d="M ${C} ${C-283} l 5 9 l -10 0 Z" fill="${COL.giltLite}"/></g>`);
+    let roman='';
+    for(let i=0;i<60;i++){
+      const a=i*6, [o1x,o1y]=pt(C,C,322,a);
+      const [o2x,o2y]=pt(C,C,(i%5===0)?311:317,a);
+      roman+=`<line x1="${f(o1x)}" y1="${f(o1y)}" x2="${f(o2x)}" y2="${f(o2y)}" stroke="${COL.gilt}" stroke-opacity="${i%5===0?0.9:0.4}" stroke-width="${i%5===0?2:1}"/>`;
+    }
+    for(let i=0;i<12;i++){
+      const [tx,ty]=pt(C,C,305,i*30);
+      roman+=`<text x="${f(tx)}" y="${f(ty)}" fill="${COL.giltLite}" font-family="Georgia,'Times New Roman',serif" font-size="20" text-anchor="middle" dominant-baseline="central">${ROM[i]}</text>`;
+    }
+    s.push(roman);
+    let body='';
+    PL.forEach(p=>{
+      if(p.ring) body+=`<ellipse id="ring_${p.k}" cx="0" cy="0" rx="${f(p.r*2.05)}" ry="${f(p.r*0.62)}" fill="none" stroke="#e4d49a" stroke-width="2" stroke-opacity="0.85"/>`;
+      body+=`<circle id="pc_${p.k}" cx="${C}" cy="${C-p.R}" r="${p.r}" fill="${p.c}" stroke="#000" stroke-opacity="0.35" stroke-width="0.6"/>`;
+    });
+    s.push(body);
+    s.push(`<circle cx="${C}" cy="${C}" r="48" fill="url(#sunHalo)"/>`);
+    s.push(`<g id="ssHour">
+      <line x1="${C}" y1="${C+24}" x2="${C}" y2="${C-145}" stroke="${COL.giltLite}" stroke-width="5" stroke-linecap="round"/>
+      <circle cx="${C}" cy="${C-162}" r="11" fill="none" stroke="${COL.giltLite}" stroke-width="3.5"/>
+      <line x1="${C}" y1="${C-173}" x2="${C}" y2="${C-190}" stroke="${COL.giltLite}" stroke-width="3.5" stroke-linecap="round"/>
+    </g>`);
+    let claws='';
+    for(let i=0;i<12;i++){
+      const a=i*30;
+      const [b1x,b1y]=pt(C,C,9,a-7),[b2x,b2y]=pt(C,C,9,a+7),[tx,ty]=pt(C,C,27,a);
+      claws+=`<path d="M ${f(b1x)} ${f(b1y)} L ${f(tx)} ${f(ty)} L ${f(b2x)} ${f(b2y)} Z" fill="url(#sunCore)"/>`;
+    }
+    s.push(`<g id="ssMinSun">
+      <line x1="${C}" y1="${C+30}" x2="${C}" y2="${C-258}" stroke="${COL.giltLite}" stroke-width="3.2" stroke-linecap="round"/>
+      <circle cx="${C}" cy="${C-274}" r="9" fill="none" stroke="${COL.giltLite}" stroke-width="2.4"/>
+      <line x1="${C}" y1="${C-283}" x2="${C}" y2="${C-298}" stroke="${COL.giltLite}" stroke-width="2.4" stroke-linecap="round"/>
+      ${claws}
+      <circle cx="${C}" cy="${C}" r="11" fill="url(#sunCore)" stroke="${COL.giltDark}" stroke-width="0.8"/>
+    </g>`);
+    s.push(`<line id="ssSecArm" x1="${C}" y1="${C}" x2="${C}" y2="${C-292}" stroke="${COL.gilt}" stroke-width="1.3"/>`);
+    s.push(`<g id="ssSecMoon">
+      <circle cx="${C}" cy="${C}" r="8" fill="${COL.moonDark}"/>
+      <path id="ssSecLit" d="" fill="url(#moonGrad)"/>
+      <circle cx="${C}" cy="${C}" r="8" fill="none" stroke="${COL.gilt}" stroke-width="1.2"/>
+    </g>`);
+    s.push(`<circle cx="${C}" cy="${C}" r="5.5" fill="${COL.giltLite}" stroke="${COL.giltDark}" stroke-width="1"/>`);
+
+    $('dial').innerHTML=s.join('');
+    PL.forEach(p=>{ p._c=$('pc_'+p.k); if(p.ring) satring=$('ring_'+p.k); });
+    ss_hour=$('ssHour'); ss_minsun=$('ssMinSun'); ss_secArm=$('ssSecArm'); ss_secMoon=$('ssSecMoon'); ss_secLit=$('ssSecLit'); ss_mark=$('ssMark');
+    let rows='';
+    PL.forEach(p=>{ rows+=`<div class="prow"><span class="dot" style="background:${p.c}"></span><span class="pn">${p.jp}</span><span class="pv" id="lo_${p.k}">—</span><span class="pd" id="ds_${p.k}">—</span></div>`; });
+    $('pgrid').innerHTML=rows;
+    PL.forEach(p=>{ dataEls[p.k]={lo:$('lo_'+p.k), ds:$('ds_'+p.k)}; });
+  }
+  function updateSolar(ms){
+    const date=new Date(ms), jd=ms/86400000+2440587.5, T=(jd-2451545)/36525;
+    PL.forEach(p=>{
+      const pos=planetPos(p,T);
+      const [x,y]=pt(C,C,p.R,norm(-pos.lon));
+      p._c.setAttribute('cx',f(x)); p._c.setAttribute('cy',f(y));
+      if(p.ring && satring) satring.setAttribute('transform',`translate(${f(x)} ${f(y)}) rotate(-18)`);
+      const d=dataEls[p.k];
+      d.lo.textContent=pos.lon.toFixed(1)+'°';
+      d.ds.textContent=(pos.dist<10?pos.dist.toFixed(2):pos.dist.toFixed(1))+' AU';
+    });
+    const hh=date.getHours(), mm=date.getMinutes(), sc=date.getSeconds(), msec=date.getMilliseconds();
+    const secf=sc+msec/1000;
+    const secA=secf*6, minA=(mm+secf/60)*6, hrA=((hh%12)+mm/60+sc/3600)*30;
+    ss_hour.setAttribute('transform',`rotate(${f(hrA)} ${C} ${C})`);
+    ss_minsun.setAttribute('transform',`rotate(${f(minA)} ${C} ${C})`);
+    const [sx,sy]=pt(C,C,292,secA);
+    ss_secArm.setAttribute('x2',f(sx)); ss_secArm.setAttribute('y2',f(sy));
+    ss_secMoon.setAttribute('transform',`translate(${f(sx-C)} ${f(sy-C)})`);
+    const sunLon=sunLongitude(jd), moonLon=moonLongitude(jd);
+    const pph=norm(moonLon-sunLon)/360;
+    ss_secLit.setAttribute('d',litPath(C,C,8,pph));
+    ss_mark.setAttribute('transform',`rotate(${f(norm(-sunLon))} ${C} ${C})`);
+    s_time.textContent=`${pad(hh)}:${pad(mm)}:${pad(sc)}`;
+    s_date.textContent=`${date.getFullYear()}年${date.getMonth()+1}月${date.getDate()}日（${WD[date.getDay()]}）`;
+  }
+
+  /* ===== mode switch + loop ===== */
+  function applyVisibility(){
+    document.body.dataset.disp = disp;
+    const clock=(mode==='clock');
+    const showDial=(disp!=='digital'), showReadout=(disp!=='analog');
+    document.querySelector('.dialWrap').style.display = showDial ? '' : 'none';
+    $('roClock').hidden = !(clock && showReadout);
+    $('roSolar').hidden = !(!clock && showReadout);
+    $('legClock').hidden = !(clock && showDial);
+    $('legSolar').hidden = !(!clock && showDial);
+  }
+  function setMode(m){
+    mode=m;
+    document.querySelectorAll('.modes button').forEach(b=>b.classList.toggle('active', b.dataset.mode===m));
+    if(m==='clock') buildClock(); else buildSolar();
+    applyVisibility();
+    tick(performance.now(), true);
+  }
+  function setDisp(d){
+    disp=d;
+    document.querySelectorAll('.dispmodes button').forEach(b=>b.classList.toggle('active', b.dataset.disp===d));
+    applyVisibility();
+  }
+  function tick(t, noStep){
+    if(ff && !noStep){ offsetMs+=(t-last)*(FF_SPEED-1); }
+    last=t;
+    const ms=Date.now()+offsetMs;
+    if(mode==='clock') updateClock(ms); else updateSolar(ms);
+    const d=new Date(ms);
+    simEl.textContent=`${d.getFullYear()}.${pad(d.getMonth()+1)}.${pad(d.getDate())}`;
+    if(!dragging){ offEl.value=Math.max(-366,Math.min(366,Math.round(offsetMs/86400000))); }
+  }
+  function loop(t){ tick(t,false); requestAnimationFrame(loop); }
+
+  /* ===== fullscreen: tap the dial (or digital readout) to use as a desk clock ===== */
+  let fsActive=false;
+  function inFs(){ return document.fullscreenElement || document.webkitFullscreenElement; }
+  function activateFs(){
+    fsActive=true; document.body.classList.add('fs');
+    const el=document.documentElement, req=el.requestFullscreen||el.webkitRequestFullscreen;
+    if(req){ try{ const r=req.call(el); if(r&&r.catch) r.catch(()=>{}); }catch(e){} }
+  }
+  function deactivateFs(){
+    fsActive=false; document.body.classList.remove('fs'); hideHint();
+    if(inFs()){ const ex=document.exitFullscreen||document.webkitExitFullscreen; if(ex){ try{ ex.call(document); }catch(e){} } }
+  }
+  function onFsChange(){ if(fsActive && !inFs()){ fsActive=false; document.body.classList.remove('fs'); hideHint(); } }
+  document.addEventListener('fullscreenchange', onFsChange);
+  document.addEventListener('webkitfullscreenchange', onFsChange);
+  let lastExit=0, lastTap=0, lastSwipe=0, hintTimer=null;
+  let sx=0, sy=0, st=0, axis=null, gestureOK=false, animating=false;
+  const DORDER=['analog','both','digital'];
+  const stage=document.querySelector('.stage');
+  function showHint(){
+    const h=$('fshint'); if(!h) return;
+    h.classList.add('show'); clearTimeout(hintTimer);
+    hintTimer=setTimeout(()=>h.classList.remove('show'), 2600);
+  }
+  function hideHint(){ const h=$('fshint'); if(h) h.classList.remove('show'); clearTimeout(hintTimer); }
+  function cycleDisp(dir){
+    const i=DORDER.indexOf(disp), n=(i+dir+DORDER.length)%DORDER.length;
+    setDisp(DORDER[n]);
+  }
+  function setTx(x, anim){
+    if(!stage) return;
+    stage.style.transition = anim ? 'transform .2s ease-out' : 'none';
+    stage.style.transform = x ? ('translateX('+x+'px)') : 'translateX(0)';
+  }
+  function clearTx(){ if(stage){ stage.style.transition=''; stage.style.transform=''; } }
+  function commit(dir){
+    animating=true;
+    const W=window.innerWidth, out=(dir>0?-W:W);
+    setTx(out, true);
+    setTimeout(()=>{
+      cycleDisp(dir);
+      setTx(-out, false);
+      requestAnimationFrame(()=>requestAnimationFrame(()=>setTx(0, true)));
+      setTimeout(()=>{ animating=false; clearTx(); }, 230);
+    }, 200);
+  }
+  function springBack(){ animating=true; setTx(0, true); setTimeout(()=>{ animating=false; clearTx(); }, 200); }
+  function onTap(){
+    if(Date.now()-lastExit<500 || Date.now()-lastSwipe<400) return;
+    if(!fsActive){ activateFs(); return; }
+    const now=Date.now();
+    if(now-lastTap<500) showHint();   // quick double-tap reveals how to exit
+    lastTap=now;
+  }
+  function onTouchStart(e){
+    if(e.touches && e.touches.length>=2){
+      gestureOK=false; axis=null;
+      if(fsActive){ e.preventDefault(); deactivateFs(); lastExit=Date.now(); }
+      return;
+    }
+    if(animating){ gestureOK=false; return; }
+    if(e.touches && e.touches.length===1){
+      const t=e.touches[0]; sx=t.clientX; sy=t.clientY; st=Date.now();
+      axis=null; gestureOK=true;
+    }
+  }
+  function onTouchMove(e){
+    if(!gestureOK || animating || !e.touches || e.touches.length!==1) return;
+    const t=e.touches[0], dx=t.clientX-sx, dy=t.clientY-sy;
+    if(axis===null && (Math.abs(dx)>8 || Math.abs(dy)>8)) axis=(Math.abs(dx)>Math.abs(dy))?'h':'v';
+    if(axis==='h'){ e.preventDefault(); setTx(dx, false); }
+  }
+  function onTouchEnd(e){
+    if(!gestureOK) return;
+    gestureOK=false;
+    if(axis!=='h'){ axis=null; return; }
+    axis=null;
+    const t=(e.changedTouches && e.changedTouches[0]);
+    const dx=(t?t.clientX-sx:0), dt=Date.now()-st;
+    lastSwipe=Date.now();
+    const thr=Math.min(80, window.innerWidth*0.2);
+    if(Math.abs(dx)>thr || (dt<300 && Math.abs(dx)>30)) commit(dx<0?1:-1);
+    else springBack();
+  }
+  if(stage){
+    stage.addEventListener('click', onTap);
+    stage.addEventListener('touchstart', onTouchStart, {passive:false});
+    stage.addEventListener('touchmove', onTouchMove, {passive:false});
+    stage.addEventListener('touchend', onTouchEnd);
+  }
+
+  /* ===== controls ===== */
+  offEl.addEventListener('pointerdown',()=>{dragging=true;});
+  window.addEventListener('pointerup',()=>{dragging=false;});
+  offEl.addEventListener('input',e=>{
+    ff=false; $('ff').classList.remove('active'); $('ff').textContent='早送り';
+    offsetMs=parseFloat(e.target.value)*86400000;
+  });
+  $('now').addEventListener('click',()=>{
+    offsetMs=0; ff=false; offEl.value=0;
+    $('ff').classList.remove('active'); $('ff').textContent='早送り';
+  });
+  $('ff').addEventListener('click',()=>{
+    ff=!ff; last=performance.now();
+    $('ff').classList.toggle('active',ff); $('ff').textContent=ff?'停止':'早送り';
+  });
+  const ffCheck=$('ffcheck'), controlsEl=$('controls');
+  if(ffCheck && controlsEl){
+    ffCheck.addEventListener('change',()=>{
+      controlsEl.hidden = !ffCheck.checked;
+      if(!ffCheck.checked){
+        ff=false; offsetMs=0; last=performance.now();
+        offEl.value=0; $('ff').classList.remove('active'); $('ff').textContent='早送り';
+      }
+    });
+  }
+  document.querySelectorAll('.modes button').forEach(b=>{
+    b.addEventListener('click',()=>setMode(b.dataset.mode));
+  });
+  document.querySelectorAll('.dispmodes button').forEach(b=>{
+    b.addEventListener('click',()=>setDisp(b.dataset.disp));
+  });
+
+  setMode('clock');
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
