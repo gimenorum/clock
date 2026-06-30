@@ -20,7 +20,7 @@
 
 GitHub Pages で公開しているので、下のリンクからブラウザですぐに試せます。
 
-https://<ユーザー名>.github.io/<リポジトリ名>/
+[https://gimenorum.github.io/clock/](https://gimenorum.github.io/clock/)
 
 ## 操作ガイド
 
